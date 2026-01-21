@@ -1,0 +1,34 @@
+---
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/3mf-photo-grouper:$COMMIT-SHA'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/3mf-photo-grouper:latest'
+      - '.'
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - '--all-tags'
+      - 'gcr.io/$PROJECT_ID/3mf-photo-grouper'
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'gcloud'
+    args:
+      - 'run'
+      - 'deploy'
+      - '3mf-photo-grouper'
+      - '--image'
+      - 'gcr.io/$PROJECT_ID/3mf-photo-grouper:$COMMIT-SHA'
+      - '--region'
+      - 'us-central1'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+images:
+  - 'gcr.io/$PROJECT_ID/3mf-photo-grouper:$COMMIT_SHA'
+  - 'gcr.io/$PROJECT_ID/3mf-photo-grouper:latest'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
