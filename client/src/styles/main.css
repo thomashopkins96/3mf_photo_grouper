@@ -23,6 +23,8 @@ body {
 .app {
   height: 100vh;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .app-header {
@@ -50,10 +52,22 @@ button {
   padding: 0.5rem 1rem;
   border-radius: 4px;
   cursor: pointer;
+  transition: background 0.2s, opacity 0.2s;
 }
 
 button:hover {
   background: #1a4a7a;
+}
+
+button:focus {
+  outline: 2px solid #4ade80;
+  outline-offset: 2px;
+}
+
+button:disabled {
+  background: #333;
+  color: #666;
+  cursor: not-allowed;
 }
 
 .layout {
@@ -207,6 +221,30 @@ button:hover {
   cursor: not-allowed;
 }
 
+.file-queue-search {
+  display: flex;
+}
+
+.file-queue-search input {
+  flex: 1;
+  background: #1a1a2e;
+  border: 1px solid #0f3460;
+  color: #eee;
+  padding: 0.5rem;
+  border-radius: 4px;
+  font-size: 0.875rem;
+}
+
+.file-queue-search input::placeholder {
+  color: #666;
+}
+
+.file-queue-search input:focus {
+  outline: none;
+  border-color: #4ade80;
+  box-shadow: 0 0 0 2px rgba(74, 222, 128, 0.25);
+}
+
 .file-queue-list {
   display: flex;
   flex-direction: column;
@@ -320,6 +358,7 @@ button:hover {
 .dialog-item input:focus {
   outline: none;
   border-color: #4ade80;
+  box-shadow: 0 0 0 2px rgba(74, 222, 128, 0.25);
 }
 
 .dialog-item-ext {

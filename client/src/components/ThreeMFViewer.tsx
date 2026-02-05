@@ -114,10 +114,17 @@ export default function ThreeMFViewer( { fileUrl }: ThreeMFViewProps) {
       sceneRef.current!.currentModel = null;
     }
 
+    let cancelled = false;
+
     const loader = new ThreeMFLoader();
     loader.load(
       fileUrl,
       (object) => {
+        if (cancelled) {
+          disposeObject(object);
+          return;
+        }
+
         const box = new THREE.Box3().setFromObject(object);
         const center = box.getCenter(new THREE.Vector3());
         object.position.sub(center);
@@ -135,9 +142,15 @@ export default function ThreeMFViewer( { fileUrl }: ThreeMFViewProps) {
       },
       undefined,
       (error) => {
-        console.error('Error loading 3MF:', error);
+        if (cancelled) {
+          console.error('Error loading 3MF:', error);
+        }
       }
     );
+
+    return () => {
+      cancelled = true;
+    };
   }, [fileUrl]);
 
   return <div ref={containerRef} className="threemf-viewer" />;

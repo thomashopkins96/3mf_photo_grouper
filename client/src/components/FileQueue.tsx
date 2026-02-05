@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { FileInfo } from '../types';
 
 interface FileQueueProps {
@@ -15,31 +16,45 @@ export default function FileQueue({
   onSaveClick,
   canSave,
 }: FileQueueProps) {
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredFiles = files.filter((file) =>
+    file.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   const currentIndex = currentFile
     ? files.findIndex((f) => f.name === currentFile.name)
     : -1;
 
   const handlePrevious = () => {
     if (currentIndex > 0) {
-      onFileSelect(files[currentIndex - 1]);
+      onFileSelect(filteredFiles[currentIndex - 1]);
     }
   };
 
   const handleNext = () => {
-    if (currentIndex < files.length - 1) {
-      onFileSelect(files[currentIndex + 1]);
+    if (currentIndex < filteredFiles.length - 1) {
+      onFileSelect(filteredFiles[currentIndex + 1]);
     }
   };
 
   return (
     <div className="file-queue">
       <div className="file-queue-nav">
+        <div className="file-queue-search">
+          <input
+            type="text"
+            placeholder="Search 3MF files..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
+        <span className="file-queue-position">
+          {currentIndex >= 0 ? currentIndex + 1 : 0} / {filteredFiles.length}
+        </span>
         <button onClick={handlePrevious} disabled={currentIndex <= 0}>
           Previous
         </button>
-        <span className="file-queue-position">
-          {currentIndex >= 0 ? currentIndex + 1 : 0} / {files.length}
-        </span>
         <button onClick={handleNext} disabled={currentIndex >= files.length - 1}>
           Next
         </button>
@@ -65,7 +80,7 @@ export default function FileQueue({
       </div>
 
       <div className="file-queue-list">
-        {files.map((file, index) => (
+        {filteredFiles.map((file, index) => (
           <div
             key={file.name}
             className={`file-queue-item ${file.name === currentFile?.name ? 'active': ''}`}

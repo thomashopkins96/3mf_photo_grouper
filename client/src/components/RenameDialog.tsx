@@ -42,7 +42,7 @@ export default function RenameDialog({
         </p>
 
         <form onSubmit={handleSubmit}>
-          <div className="dialog-list">isSaving ?
+          <div className="dialog-list">
             {editedImages.map((img, index) => (
               <div key={img.name} className="dialog-item">
                 <span className="dialog-item-index">{index + 1}</span>
