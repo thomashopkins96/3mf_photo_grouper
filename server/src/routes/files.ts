@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { listThreeMfFiles, listImages, getThreeMfStream, getImageStream, deleteThreeMf, deleteOutputFolder } from '../services/gcs.js'
+import { listThreeMfFiles, listImages, getThreeMfStream, getImageStream, deleteThreeMf, deleteOutputFolder, renameThreeMf } from '../services/gcs.js'
 import { getSession } from './auth.js';
 import { ApiResponse, FileInfo } from '../types/index.js';
 
