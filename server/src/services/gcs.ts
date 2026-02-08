@@ -93,3 +93,26 @@ export async function copyThreeMfToOutput(
 
   await sourceFile.copy(destFile);
 }
+
+export async function deleteThreeMf(accessToken: string, fileName: string): Promise<void> {
+  const storage = getStorage(accessToken);
+  await storage.bucket(BUCKETS.threeMf).file(fileName).delete();
+}
+
+export async function deleteOutputFolder(accessToken: string, folderName: string): Promise<void> {
+  const storage = getStorage(accessToken);
+  const bucket = storage.bucket(BUCKETS.output);
+  const [files] = await bucket.getFiles({ prefix: `${folderName}/`});
+
+  if (files.length > 0) {
+    await Promise.all(files.map(file => file.delete()));
+  }
+}
+
+export async function renameThreeMf(accessToken: string, oldName: string, newName: string): Promise<void> {
+  const storage = getStorage(accessToken);
+  const bucket = storage.bucket(BUCKETS.threeMf);
+
+  await bucket.file(oldName).copy(bucket.file(newName));
+  await bucket.file(oldName).delete();
+}

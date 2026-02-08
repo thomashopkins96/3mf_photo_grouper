@@ -40,6 +40,40 @@ body {
   font-size: 1.25rem;
 }
 
+.app-header-left {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.app-tabs {
+  display: flex;
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid #0f3460;
+}
+
+.app-tab {
+  background: transparent;
+  color: #888;
+  border: none;
+  border-radius: 0;
+  padding: 0.375rem 0.75rem;
+  font-size: 0.8125rem;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+
+.app-tab:hover {
+  background: #0f3460;
+  color: #eee;
+}
+
+.app-tab:active {
+  background: #0f3460;
+  color: #4ade80;
+}
+
 .app-main {
   flex: 1;
   min-height: 0;
@@ -68,6 +102,168 @@ button:disabled {
   background: #333;
   color: #666;
   cursor: not-allowed;
+}
+
+.viewer-layout {
+  display: flex;
+  height: 100%;
+}
+
+.viewer-sidebar {
+  width: 300px;
+  flex-shrink: 0;
+  border-right: 1px solid #0f3460;
+  display: flex;
+  flex-direction: column;
+  backgroud: #16213e;
+}
+
+.viewer-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.viewer-file-list {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.viewer-file-list-search {
+  padding: 0.75rem;
+  border-bottom: 1px solid #0f3460;
+}
+
+.viewer-file-list-search input {
+  width: 100%;
+  background: #1a1a2e;
+  border: 1px solid #0f3460;
+  color: #eee;
+  padding: 0.5rem;
+  border-radius: 4px;
+  font-size: 0.875rem;
+}
+
+.viewer-file-list-search input::placeholder {
+  color: #666;
+}
+
+.viewer-file-list-search input:focus {
+  outline: none;
+  border-color: #4ade80;
+  box-shadow: 0 0 0 2px rgba(74, 222, 128, 0.25);
+}
+
+.viewer-file-list-count {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.75rem;
+  color: #888;
+  border-bottom: 1px solid #0f3460;
+}
+
+.viewer-file-list-items {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.viewer-file-list-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0.75rem;
+  cursor: pointer;
+  transition: background 0.2s;
+  border-bottom: 1px solid rgba(15, 52, 96, 0.3);
+}
+
+.viewer-file-list-item:hover {
+  background: #1e2d4a;
+}
+
+.viewer-file-list-item.active {
+  background: #0f3460;
+}
+
+.viewer-file-list-item-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.875rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.viewer-file-list-item-delete {
+  background: transparent;
+  color: #888;
+  border: 1px solid transparent;
+  padding: 0.125rem 0.375rem;
+  font-size: 1rem;
+  line-height: 1;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.viewer-file-list-item-delete:hover {
+  background: #dc2626;
+  color: #fff;
+  border-color: #dc2626;
+}
+
+.viewer-file-list-item-actions {
+  display: flex;
+  gap: 0.25rem;
+  flex-shrink: 0;
+  margin-left: 0.5rem;
+}
+
+.viewer-file-list-item-rename {
+  background: transparent;
+  color: #888;
+  border: 1px solid transparent;
+  padding: 0.125rem 0.375rem;
+  font-size: 0.875rem;
+  line-height: 1;
+  border-radius: 4px;
+}
+
+.viewer-file-list-item-rename:hover {
+  background: #0f3460;
+  color: #4ade80;
+  border-color: #0f3460;
+}
+
+.viewer-file-list-item-edit {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+  gap: 0.25rem;
+}
+
+.viewer-file-list-item-edit input {
+  flex: 1;
+  min-width: 0;
+  background: #1a1a2e;
+  border: 1px solid #4ade80;
+  color: #eee;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.875rem;
+}
+
+.viewer-file-list-item-ext {
+  color: #888;
+  font-size: 0.75rem;
+}
+
+.dialog-delete {
+  background: #dc2626;
+  color: #fff;
+}
+
+.dialog-delete:hover:not(:disabled) {
+  background: #b91c1c;
 }
 
 .layout {
@@ -264,7 +460,7 @@ button:disabled {
 }
 
 .file-queue-item:hover {
-  background: #1a1a2e
+  background: #1e2d4a;
 }
 
 .file-queue-item.active {

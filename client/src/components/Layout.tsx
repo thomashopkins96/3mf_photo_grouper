@@ -71,7 +71,7 @@ export default function Layout({ leftPanel, rightPanel }: LayoutProps) {
         {leftPanel}
       </div>
       <div className="layout-divider" onMouseDown={handleMouseDown} />
-      <div className="layout-panel layout-panel-right" style={{ width: `${100 - leftWidth}% - 3px` }}>
+      <div className="layout-panel layout-panel-right" style={{ width: `calc(${100 - leftWidth}% - 3px)` }}>
         {rightPanel}
       </div>
     </div>

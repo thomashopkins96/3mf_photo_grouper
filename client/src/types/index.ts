@@ -17,3 +17,4 @@ export interface ApiResponse<T> {
 
 export type LoadingState = 'idle' | 'loading' | 'success' | 'error';
 
+export type TabType = 'photo-grouper' | '3mf-viewer';

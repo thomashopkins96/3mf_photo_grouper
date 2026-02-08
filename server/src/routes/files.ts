@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { listThreeMfFiles, listImages, getThreeMfStream, getImageStream } from '../services/gcs.js'
+import { listThreeMfFiles, listImages, getThreeMfStream, getImageStream, deleteThreeMf, deleteOutputFolder } from '../services/gcs.js'
 import { getSession } from './auth.js';
 import { ApiResponse, FileInfo } from '../types/index.js';
 
@@ -28,6 +28,7 @@ router.get('/3mf/:name', async (req: Request, res: Response) => {
       res.status(401).json({ success: false, error: 'Unauthorized' });
       return;
     }
+
 
     const stream = getThreeMfStream(session.accessToken, req.params.name);
     res.setHeader('Content-Type', 'application/octet-stream');
@@ -67,6 +68,50 @@ router.get('/image/:name(*)', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Error stream image:', error);
     res.status(500).json({ success: false, error: 'Failed to stream image' });
+  }
+});
+
+router.delete('/3mf/:name', async (req: Request, res: Response<ApiResponse<string>>) => {
+  try {
+    const session = getSession(req);
+    if (!session) {
+      res.status(401).json({ success: false, error: 'Unauthorized' });
+      return;
+    }
+
+    const fileName = req.params.name;
+    const folderName = fileName.replace(/\.3mf$/i, '');
+
+    await deleteThreeMf(session.accessToken, fileName);
+    await deleteOutputFolder(session.accessToken, folderName);
+
+    res.json({ success: true, data: `Deleted ${fileName}` });
+  } catch (error) {
+    console.error('Error deleting 3MF file:', error);
+    res.status(500).json({ success: false, error: 'Failed to delete 3MF file' });
+  }
+});
+
+router.patch('/3mf/:name', async (req: Request, res: Response<ApiResponse<string>>) => {
+  try {
+    const session = getSession(req);
+    if (!session) {
+      res.status(401).json({ success: false, error: 'Unauthorized' });
+      return;
+    }
+    const oldName = req.params.name;
+    const { newName } = req.body;
+
+    if (!newName) {
+      res.status(400).json({ success: false, error: "New name is required" });
+      return
+    }
+
+    await renameThreeMf(session.accessToken, oldName, newName)
+    res.json({ success: true, data: `Renamed ${oldName} to ${newName}` })
+  } catch (error) {
+    console.error('Error renaming 3MF file:', error);
+    res.status(500).json({ success: false, error: 'Failed to rename 3MF file' });
   }
 });
 

@@ -41,12 +41,14 @@ export default function ThreeMFViewer( { fileUrl }: ThreeMFViewProps) {
     scene.background = new THREE.Color(0x1a1a2e);
 
     const camera = new THREE.PerspectiveCamera(45, width/height, 0.1, 1000);
-    camera.position.set(0, 100, 0);
+    camera.position.set(0, 80, 60);
     camera.lookAt(0, 0, 0);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(width, height);
     renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.2;
     container.appendChild(renderer.domElement);
 
     const controls = new OrbitControls(camera, renderer.domElement);
@@ -107,7 +109,7 @@ export default function ThreeMFViewer( { fileUrl }: ThreeMFViewProps) {
   useEffect(() => {
     if (!sceneRef.current || !fileUrl) return;
 
-    const { scene, camera, currentModel } = sceneRef.current;
+    const { scene, camera, controls, currentModel } = sceneRef.current;
     if (currentModel) {
       disposeObject(currentModel);
       scene.remove(currentModel);
@@ -126,19 +128,48 @@ export default function ThreeMFViewer( { fileUrl }: ThreeMFViewProps) {
         }
 
         const box = new THREE.Box3().setFromObject(object);
-        const center = box.getCenter(new THREE.Vector3());
-        object.position.sub(center);
-
         const size = box.getSize(new THREE.Vector3());
         const maxDim = Math.max(size.x, size.y, size.z);
         const scale = 50 / maxDim;
+
         object.scale.setScalar(scale);
+
+        const scaledBox = new THREE.Box3().setFromObject(object);
+        const center = scaledBox.getCenter(new THREE.Vector3());
+
+        object.position.sub(center);
+
+
+        object.traverse((child) => {
+          if (child instanceof THREE.Mesh) {
+            const isDefaultGrey =
+              child.material instanceof THREE.MeshPhongMaterial &&
+              child.material.color.getHex() === 0x999999;
+
+            if (isDefaultGrey) {
+              child.material.dispose();
+              child.material = new THREE.MeshStandardMaterial({
+                color: 0x6a9fd8,
+                metalness: 0.2,
+                roughness: 0.6,
+              });
+            }
+
+            const edges = new THREE.EdgesGeometry(child.geometry, 30);
+            const line = new THREE.LineSegments(
+              edges,
+              new THREE.LineBasicMaterial({ color: 0x000000, opacity: 0.3, transparent: true })
+            );
+            child.add(line);
+          }
+        });
 
         scene.add(object);
         sceneRef.current!.currentModel = object;
 
-        camera.position.set(0, 0, 100);
-        camera.lookAt(0, 0, 0);
+        controls.target.set(0, 0, 0);
+        camera.position.set(0, 80, 60);
+        controls.update();
       },
       undefined,
       (error) => {
