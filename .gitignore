@@ -1,5 +1,2 @@
-cloudbuild.yaml
-package-lock.json
 .env
-.dockerignore
-Dockerfile
+node-modules
