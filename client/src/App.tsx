@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { FileInfo, SelectedImage, TabType } from './types';
 import { useFiles } from './hooks/useFiles';
 import { useGroups } from './hooks/useGroups';
@@ -13,6 +13,8 @@ import ThreeMFFileList from './components/ThreeMFFileList';
 import LoginForm from './components/LoginForm';
 
 export default function App() {
+  const ThreeMFViewer = lazy(() => import('./components/ThreeMFViewer'));
+
   const [currentFile, setCurrentFile] = useState<FileInfo | null>(null);
   const [selectedImages, setSelectedImages] = useState<SelectedImage[]>([]);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -189,7 +191,9 @@ export default function App() {
               leftPanel={<ThreeMFViewer fileUrl={threeMfUrl} />}
               rightPanel={
                 imagesState === 'loading' ? (
-                  <div className="gallery-empty">Loading images...</div>
+                  <Suspense fallback={<div className="gallery-empty">Loading images...</div>}>
+                    <ThreeMFViewer fileUrl={threeMfUrl} />
+                  </Suspense>
                 ) : (
                   <ImageGallery
                     images={images}

@@ -4,6 +4,20 @@ import { getSession } from './auth.js';
 import { ApiResponse, FileInfo } from '../types/index.js';
 
 const router = Router();
+const listCache = new Map<string, { data: FileInfo[], timestamp: number }>();
+const CACHE_TTL = 60_000;
+
+function getCachedList(key: string): FileInfo[] | null {
+  const entry = listCache.get(key);
+  if (entry && Date.now() - entry.timestamp < CACHE_TTL) {
+    return entry.data;
+  }
+  return null;
+}
+
+function setCachedList(key: string, data: FileInfo[]): void {
+  listCache.set(key, { data, timestamp: Date.now() });
+}
 
 router.get('/3mf', async (req: Request, res: Response<ApiResponse<FileInfo[]>>) => {
   try {
@@ -12,8 +26,14 @@ router.get('/3mf', async (req: Request, res: Response<ApiResponse<FileInfo[]>>) 
       res.status(401).json({ success: false, error: 'Unauthorized' });
       return;
     }
+    const cached = getCachedList('.3mf');
+    if (cached) {
+      res.json({ success: true, data: cached });
+      return
+      }
 
     const files = await listThreeMfFiles(session.accessToken);
+    setCachedList('3mf', files);
     res.json({ success: true, data: files });
   } catch (error) {
     console.error('Error listing 3MF files:', error);
@@ -32,6 +52,7 @@ router.get('/3mf/:name', async (req: Request, res: Response) => {
 
     const stream = getThreeMfStream(session.accessToken, req.params.name);
     res.setHeader('Content-Type', 'application/octet-stream');
+    res.setHeader('Cache-Control', 'private, max-age=3600');
     stream.pipe(res)
   } catch (error) {
     console.error('Error streaming 3MF file:', error);
@@ -64,6 +85,7 @@ router.get('/image/:name(*)', async (req: Request, res: Response) => {
     }
 
     const stream = getImageStream(session.accessToken, req.params.name);
+    res.setHeader('Cache-Control', 'private, max=3600');
     stream.pipe(res);
   } catch (error) {
     console.error('Error stream image:', error);
@@ -84,6 +106,8 @@ router.delete('/3mf/:name', async (req: Request, res: Response<ApiResponse<strin
 
     await deleteThreeMf(session.accessToken, fileName);
     await deleteOutputFolder(session.accessToken, folderName);
+
+    listCache.delete('3mf');
 
     res.json({ success: true, data: `Deleted ${fileName}` });
   } catch (error) {
@@ -107,7 +131,10 @@ router.patch('/3mf/:name', async (req: Request, res: Response<ApiResponse<string
       return
     }
 
-    await renameThreeMf(session.accessToken, oldName, newName)
+    await renameThreeMf(session.accessToken, oldName, newName);
+
+    listCache.delete('3mf');
+
     res.json({ success: true, data: `Renamed ${oldName} to ${newName}` })
   } catch (error) {
     console.error('Error renaming 3MF file:', error);

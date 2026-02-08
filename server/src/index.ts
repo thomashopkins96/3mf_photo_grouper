@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import compression from 'compression';
 import express, { Request, Response } from 'express';
 import cookieParser from 'cookie-parser';
 import path from 'path';
@@ -12,6 +13,8 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 8080;
+
+app.use(compression());
 
 app.use(express.json());
 app.use(cookieParser());
