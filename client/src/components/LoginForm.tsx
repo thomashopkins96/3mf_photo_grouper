@@ -20,7 +20,7 @@ export default function LoginForm({ onCheckAuth }: LoginFormProps) {
   if (checking) {
     return (
       <div className="login-container">
-        <h1>3MF Photo Grouper</h1>
+        <h1>SBA Cloud Storage Management</h1>
         <p>Checking authentication...</p>
       </div>
     );
@@ -28,7 +28,7 @@ export default function LoginForm({ onCheckAuth }: LoginFormProps) {
 
   return (
     <div className="login-container">
-      <h1>3MF Photo Grouper</h1>
+      <h1>SBA Cloud Storage Management</h1>
       <p>Sign in with your Google account to continue</p>
       <button onClick={handleLogin} className="login-button">
         Sign in with Google

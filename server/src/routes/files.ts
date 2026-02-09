@@ -1,11 +1,15 @@
 import { Router, Request, Response } from 'express';
-import { listThreeMfFiles, listImages, getThreeMfStream, getImageStream, deleteThreeMf, deleteOutputFolder, renameThreeMf } from '../services/gcs.js'
+import { listThreeMfFiles, listImages, getThreeMfStream, getImageStream, deleteThreeMf, deleteOutputFolder, renameThreeMf, deleteImage, listOutputFolders } from '../services/gcs.js'
 import { getSession } from './auth.js';
 import { ApiResponse, FileInfo } from '../types/index.js';
 
 const router = Router();
 const listCache = new Map<string, { data: FileInfo[], timestamp: number }>();
 const CACHE_TTL = 60_000;
+
+export function invalidateFileCache(): void {
+  listCache.delete('3mf');
+}
 
 function getCachedList(key: string): FileInfo[] | null {
   const entry = listCache.get(key);
@@ -26,15 +30,25 @@ router.get('/3mf', async (req: Request, res: Response<ApiResponse<FileInfo[]>>) 
       res.status(401).json({ success: false, error: 'Unauthorized' });
       return;
     }
-    const cached = getCachedList('.3mf');
+    const cached = getCachedList('3mf');
     if (cached) {
       res.json({ success: true, data: cached });
       return
       }
 
-    const files = await listThreeMfFiles(session.accessToken);
-    setCachedList('3mf', files);
-    res.json({ success: true, data: files });
+    const [files, groupedFolders] = await Promise.all([
+      listThreeMfFiles(session.accessToken),
+      listOutputFolders(session.accessToken),
+    ]);
+
+    const groupedSet = new Set(groupedFolders);
+    const ungrouped = files.filter((file) => {
+      const folderName = file.name.replace(/\.3mf$/i, '');
+      return !groupedSet.has(folderName);
+    })
+
+    setCachedList('3mf', ungrouped);
+    res.json({ success: true, data: ungrouped });
   } catch (error) {
     console.error('Error listing 3MF files:', error);
     res.status(500).json({ success: false, error: 'Failed to list 3MF files' });
@@ -48,7 +62,6 @@ router.get('/3mf/:name', async (req: Request, res: Response) => {
       res.status(401).json({ success: false, error: 'Unauthorized' });
       return;
     }
-
 
     const stream = getThreeMfStream(session.accessToken, req.params.name);
     res.setHeader('Content-Type', 'application/octet-stream');
@@ -85,11 +98,29 @@ router.get('/image/:name(*)', async (req: Request, res: Response) => {
     }
 
     const stream = getImageStream(session.accessToken, req.params.name);
-    res.setHeader('Cache-Control', 'private, max=3600');
+    res.setHeader('Cache-Control', 'private, max-age=3600');
     stream.pipe(res);
   } catch (error) {
     console.error('Error stream image:', error);
     res.status(500).json({ success: false, error: 'Failed to stream image' });
+  }
+});
+
+router.delete('/image/:name(*)', async (req: Request, res: Response<ApiResponse<string>>) => {
+  try {
+    const session = getSession(req);
+    if (!session) {
+      res.status(401).json({ success: false, error: 'Unauthorized' });
+      return
+    }
+
+    const fileName = req.params.name;
+    await deleteImage(session.accessToken, fileName);
+
+    res.json({ success: true, data: `Deleted ${fileName}` });
+  } catch (error) {
+    console.error('Error deleting image:', error);
+    res.status(500).json({ success: false, error: 'Failed to delete image' });
   }
 });
 

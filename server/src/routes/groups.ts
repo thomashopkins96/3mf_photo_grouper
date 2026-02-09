@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { copyImageToOutput, copyThreeMfToOutput, deleteImage } from '../services/gcs.js'
 import { getSession } from './auth.js';
 import { ApiResponse, GroupRequest } from '../types/index.js'
+import { invalidateFileCache } from './files.js';
 
 const router = Router();
 
@@ -28,6 +29,7 @@ router.post('/', async (
       await deleteImage(session.accessToken, image.originalName);
     }
 
+    invalidateFileCache();
     res.json({ success: true, data: `Created group: ${folderName}` });
   } catch (error) {
     console.error('Error creating group:', error);

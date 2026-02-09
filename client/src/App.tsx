@@ -4,7 +4,6 @@ import { useFiles } from './hooks/useFiles';
 import { useGroups } from './hooks/useGroups';
 import { useFileActions } from './hooks/useFileActions';
 import Layout from './components/Layout';
-import ThreeMFViewer from './components/ThreeMFViewer'
 import ImageGallery from './components/ImageGallery';
 import FileQueue from './components/FileQueue'
 import RenameDialog from './components/RenameDialog';
@@ -12,11 +11,12 @@ import ConfirmDialog from './components/ConfirmDialog';
 import ThreeMFFileList from './components/ThreeMFFileList';
 import LoginForm from './components/LoginForm';
 
-export default function App() {
-  const ThreeMFViewer = lazy(() => import('./components/ThreeMFViewer'));
+const ThreeMFViewer = lazy(() => import('./components/ThreeMFViewer'));
 
+export default function App() {
   const [currentFile, setCurrentFile] = useState<FileInfo | null>(null);
   const [selectedImages, setSelectedImages] = useState<SelectedImage[]>([]);
+  const [imageToDelete, setImageToDelete] = useState<FileInfo | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>('photo-grouper');
@@ -28,7 +28,7 @@ export default function App() {
   const { files: threeMfFiles, state: threeMfState, refetch: refetchThreeMf } = useFiles('3mf');
   const { files: images, state: imagesState, refetch: refetchImages } = useFiles('images');
   const { saveGroup, state: saveState } = useGroups();
-  const { deleteFile, renameFile, state: fileActionState } = useFileActions();
+  const { deleteFile, renameFile, deleteImage, state: fileActionState } = useFileActions();
 
   const checkAuth = async () => {
     try {
@@ -66,7 +66,7 @@ export default function App() {
   if (!authChecked) {
     return (
       <div className="login-container">
-        <h1>3MF Photo Grouper</h1>
+        <h1>SBA Cloud Storage Management</h1>
         <p>Loading...</p>
       </div>
     );
@@ -136,6 +136,25 @@ export default function App() {
     setFileToDelete(null);
   };
 
+  const handleImageDeleteClick = (image: FileInfo) => {
+    setImageToDelete(image);
+  }
+
+  const handleImageDeleteConfirm = async () => {
+    if (!imageToDelete) return;
+
+    const success = await deleteImage(imageToDelete.name);
+    if (success) {
+      setSelectedImages(selectedImages.filter((img) => img.name !== imageToDelete.name));
+      setImageToDelete(null);
+      refetchImages();
+    }
+  };
+
+  const handleImageDeleteCancel = () => {
+    setImageToDelete(null);
+  };
+
   const handleRename = async (file: FileInfo, newName: string) => {
     const success = await renameFile(file.name, newName);
     if (success) {
@@ -188,17 +207,20 @@ export default function App() {
           />
           <main className="app-main">
             <Layout
-              leftPanel={<ThreeMFViewer fileUrl={threeMfUrl} />}
+              leftPanel={
+                <Suspense fallback={<div className="gallery-empty">Loading viewer...</div>}>
+                  <ThreeMFViewer fileUrl={threeMfUrl} />
+                </Suspense>
+              }
               rightPanel={
                 imagesState === 'loading' ? (
-                  <Suspense fallback={<div className="gallery-empty">Loading images...</div>}>
-                    <ThreeMFViewer fileUrl={threeMfUrl} />
-                  </Suspense>
+                  <div className="gallery-empty">Loading images...</div>
                 ) : (
                   <ImageGallery
                     images={images}
                     selectedImages={selectedImages}
                     onSelectionChange={setSelectedImages}
+                    onDeleteImage={handleImageDeleteClick}
                   />
                 )
               }
@@ -244,6 +266,17 @@ export default function App() {
           isLoading={fileActionState === 'loading'}
           onConfirm={handleDeleteConfirm}
           onCancel={handleDeleteCancel}
+        />
+      )}
+
+      {imageToDelete && (
+        <ConfirmDialog
+          title="Delete image"
+          message={`Are you sure you want to delete "${imageToDelete.name}"?`}
+          confirmLabel="Delete"
+          isLoading={fileActionState === 'loading'}
+          onConfirm={handleImageDeleteConfirm}
+          onCancel={handleImageDeleteCancel}
         />
       )}
     </div>

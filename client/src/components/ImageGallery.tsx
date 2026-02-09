@@ -1,15 +1,18 @@
+import { useState } from 'react';
 import { FileInfo, SelectedImage } from '../types';
 
 interface ImageGalleryProps {
   images: FileInfo[];
   selectedImages: SelectedImage[];
   onSelectionChange: (selected: SelectedImage[]) => void;
+  onDeleteImage: (image: FileInfo) => void;
 }
 
 export default function ImageGallery({
   images,
   selectedImages,
   onSelectionChange,
+  onDeleteImage,
   }: ImageGalleryProps) {
   const getSelectionIndex = (name: string): number => {
     return selectedImages.findIndex((img) => img.name === name);
@@ -32,6 +35,11 @@ export default function ImageGallery({
       };
       onSelectionChange([...selectedImages, newImage]);
     }
+  };
+
+  const handleDeleteClick = (e: React.MouseEvent, image: FileInfo) => {
+    e.stopPropagation();
+    onDeleteImage(image);
   };
 
   if (images.length === 0) {
@@ -61,6 +69,14 @@ export default function ImageGallery({
           />
           {isSelected && (
             <div className="gallery-item-badge">{selectionIndex + 1}</div>
+          )}
+          {isSelected && (<div
+            className="gallery-item-delete"
+            onClick={(e) => handleDeleteClick(e, image)}
+            title="Delete image"
+          >
+            &times;
+          </div>
           )}
           </div>
         );

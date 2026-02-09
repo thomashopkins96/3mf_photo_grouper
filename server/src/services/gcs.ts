@@ -26,7 +26,7 @@ export async function listThreeMfFiles(accessToken: string): Promise<FileInfo[]>
   const [files] = await bucket.getFiles();
 
   return files
-    .filter(file => file.name.endsWith('.3mf'))
+    .filter(file => file.name.endsWith('.3mf') && !file.name.startsWith('uploaded_to_cults/'))
     .map(file => ({
       name: file.name,
       size: Number(file.metadata.size) || 0,
@@ -115,4 +115,19 @@ export async function renameThreeMf(accessToken: string, oldName: string, newNam
 
   await bucket.file(oldName).copy(bucket.file(newName));
   await bucket.file(oldName).delete();
+}
+
+export async function listOutputFolders(accessToken: string): Promise<string[]> {
+  const storage = getStorage(accessToken);
+  const [files] = await storage.bucket(BUCKETS.output).getFiles({ delimiter: '/' });
+  const prefixes = new Set<string>();
+
+  for (const file of files) {
+    const folder = file.name.split('/')[0];
+    if (folder) {
+      prefixes.add(folder);
+    }
+  }
+
+  return Array.from(prefixes);
 }

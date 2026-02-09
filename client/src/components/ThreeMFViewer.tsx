@@ -55,6 +55,11 @@ export default function ThreeMFViewer( { fileUrl }: ThreeMFViewProps) {
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
 
+    const isMobile = window.matchMedia('(max-width: 768px)').matches;
+    if (isMobile) {
+      controls.enabled = false;
+    }
+
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.2);
     scene.add(ambientLight);
 
