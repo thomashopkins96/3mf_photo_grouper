@@ -25,8 +25,8 @@ export default function App() {
   const [authChecked, setAuthChecked] = useState(false);
   const [showRenameDialog, setShowRenameDialog] = useState(false);
 
-  const { files: threeMfFiles, state: threeMfState, refetch: refetchThreeMf } = useFiles('3mf');
-  const { files: images, state: imagesState, refetch: refetchImages } = useFiles('images');
+  const { files: threeMfFiles, state: threeMfState, refetch: refetchThreeMf, setFiles: setThreeMfFiles } = useFiles('3mf');
+  const { files: images, state: imagesState, refetch: refetchImages, setFiles: setImages } = useFiles('images');
   const { saveGroup, state: saveState } = useGroups();
   const { deleteFile, renameFile, deleteImage, state: fileActionState } = useFileActions();
 
@@ -100,10 +100,10 @@ export default function App() {
 
     if (success) {
       setShowRenameDialog(false);
+      setThreeMfFiles(prev => prev.filter(f => f.name !== currentFile.name));
+      setImages(prev => prev.filter(i => !renamedImages.some(r => r.name === i.name)));
       setSelectedImages([]);
       setCurrentFile(null);
-      refetchThreeMf();
-      refetchImages();
     }
   };
 
@@ -127,8 +127,8 @@ export default function App() {
         setCurrentFile(null);
         setSelectedImages([]);
       }
+      setThreeMfFiles(prev => prev.filter(f => f.name !== fileToDelete.name));
       setFileToDelete(null);
-      refetchThreeMf();
     }
   };
 
@@ -146,8 +146,8 @@ export default function App() {
     const success = await deleteImage(imageToDelete.name);
     if (success) {
       setSelectedImages(selectedImages.filter((img) => img.name !== imageToDelete.name));
+      setImages(prev => prev.filter(i => i.name !== imageToDelete.name));
       setImageToDelete(null);
-      refetchImages();
     }
   };
 
@@ -164,7 +164,9 @@ export default function App() {
       if (currentFile?.name === file.name) {
         setCurrentFile({ ...file, name: newName });
       }
-      refetchThreeMf();
+      setThreeMfFiles(prev => prev.map(f =>
+        f.name === file.name ? { ...f, name: newName } : f
+      ));
     }
   };
 

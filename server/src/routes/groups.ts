@@ -21,13 +21,12 @@ router.post('/', async (
     const folderName = threeMfName.replace(/\.3mf$/i, '');
     await copyThreeMfToOutput(session.accessToken, threeMfName, folderName);
 
-    for (const image of images) {
-      const ext = image.originalName.match(/\.[^.]+$/)?.[0] || '.jpg';
-      const destFileName = image.newName + ext;
-
-      await copyImageToOutput(session.accessToken, image.originalName, folderName, destFileName);
-      await deleteImage(session.accessToken, image.originalName);
-    }
+    await Promise.all(images.map(async (image) => {
+        const ext = image.originalName.match(/\.[^.]+$/)?.[0] || '.jpg';
+        const destFileName = image.newName + ext;
+        await copyImageToOutput(session.accessToken, image.originalName, folderName, destFileName);
+        await deleteImage(session.accessToken, image.originalName);
+      }));
 
     invalidateFileCache();
     res.json({ success: true, data: `Created group: ${folderName}` });

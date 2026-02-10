@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { listThreeMfFiles, listImages, getThreeMfStream, getImageStream, deleteThreeMf, deleteOutputFolder, renameThreeMf, deleteImage, listOutputFolders } from '../services/gcs.js'
+import { listThreeMfFiles, listImages, getThreeMfStream, getImageStream, deleteThreeMf, deleteOutputFolder, renameThreeMf, deleteImage, listOutputFolders, getImageThumbnailStream } from '../services/gcs.js'
 import { getSession } from './auth.js';
 import { ApiResponse, FileInfo } from '../types/index.js';
 
@@ -9,6 +9,7 @@ const CACHE_TTL = 60_000;
 
 export function invalidateFileCache(): void {
   listCache.delete('3mf');
+  listCache.delete('images');
 }
 
 function getCachedList(key: string): FileInfo[] | null {
@@ -81,11 +82,36 @@ router.get('/images', async (req: Request, res: Response<ApiResponse<FileInfo[]>
       return;
     }
 
+    const cached = getCachedList('images');
+    if (cached) {
+      res.json({ success: true, data: cached });
+      return;
+    }
+
     const files = await listImages(session.accessToken);
+    setCachedList('images', files);
     res.json({ success: true, data: files });
   } catch (error) {
     console.error('Error listing images:', error);
     res.status(500).json({ success: false, error: 'Failed to list images' });
+  }
+});
+
+router.get('/image/:name(*)/thumbnail', async (req: Request, res: Response) => {
+  try {
+    const session = getSession(req);
+    if (!session) {
+      res.status(401).json({ success: false, error: "Unauthorized"});
+      return;
+    }
+
+    const stream = getImageThumbnailStream(session.accessToken, req.params.name);
+    res.setHeader('Content-Type', 'image/jpeg');
+    res.setHeader('Cache-Control', 'private, max-age=86400');
+    stream.pipe(res);
+  } catch (error) {
+    console.error('Error streaming thumbnail:', error);
+    res.status(500).json({ success: false, error: 'Failed to stream thumbnail' });
   }
 });
 
@@ -98,7 +124,7 @@ router.get('/image/:name(*)', async (req: Request, res: Response) => {
     }
 
     const stream = getImageStream(session.accessToken, req.params.name);
-    res.setHeader('Cache-Control', 'private, max-age=3600');
+    res.setHeader('Cache-Control', 'private, max-age=86400');
     stream.pipe(res);
   } catch (error) {
     console.error('Error stream image:', error);
@@ -116,6 +142,7 @@ router.delete('/image/:name(*)', async (req: Request, res: Response<ApiResponse<
 
     const fileName = req.params.name;
     await deleteImage(session.accessToken, fileName);
+    listCache.delete('images');
 
     res.json({ success: true, data: `Deleted ${fileName}` });
   } catch (error) {

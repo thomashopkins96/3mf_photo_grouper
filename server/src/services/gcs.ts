@@ -1,5 +1,7 @@
 import { Storage } from '@google-cloud/storage';
 import { FileInfo } from '../types/index.js';
+import sharp from 'sharp';
+import { PassThrough } from 'stream';
 
 const storage = new Storage();
 
@@ -10,14 +12,22 @@ const BUCKETS = {
 };
 
 const IMAGE_FOLDER = process.env.GCS_IMAGE_FOLDER || '';
+const storageCache = new Map<string, { storage: Storage; timestamp: number }>();
+const STORGE_CACHE_TTL = 30 * 60_000;
 
 function getStorage(accessToken: string): Storage {
-  return new Storage({
+  const cached = storageCache.get(accessToken);
+  if (cached && Date.now() - cached.timestamp < STORGE_CACHE_TTL) {
+    return cached.storage;
+  }
+  const instance = new Storage({
     authClient: {
       getAccessToken: async () => ({ token: accessToken }),
       getRequestHeaders: async () => ({ Authorization: `Bearer ${accessToken}` }),
-    } as any,
+    } as any
   });
+  storageCache.set(accessToken, { storage: instance, timestamp: Date.now() });
+  return instance;
 }
 
 export async function listThreeMfFiles(accessToken: string): Promise<FileInfo[]> {
@@ -119,15 +129,14 @@ export async function renameThreeMf(accessToken: string, oldName: string, newNam
 
 export async function listOutputFolders(accessToken: string): Promise<string[]> {
   const storage = getStorage(accessToken);
-  const [files] = await storage.bucket(BUCKETS.output).getFiles({ delimiter: '/' });
-  const prefixes = new Set<string>();
+  const [, , apiResponse] = await storage.bucket(BUCKETS.output).getFiles({ delimiter: '/' });
+  const prefixes: string[] = (apiResponse as any)?.prefixes || [];
+  return prefixes.map(p => p.replace(/\/$/, ''));
+}
 
-  for (const file of files) {
-    const folder = file.name.split('/')[0];
-    if (folder) {
-      prefixes.add(folder);
-    }
-  }
-
-  return Array.from(prefixes);
+export function getImageThumbnailStream(accessToken: string, fileName: string, width = 400) {
+  const storage = getStorage(accessToken);
+  const readStream = storage.bucket(BUCKETS.images).file(fileName).createReadStream();
+  const transform = sharp().resize(width).jpeg({ quality: 70 });
+  return readStream.pipe(transform);
 }

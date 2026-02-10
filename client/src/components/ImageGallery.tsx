@@ -63,7 +63,7 @@ export default function ImageGallery({
             onClick={() => handleImageClick(image)}
           >
           <img
-            src={`/api/files/image/${encodeURIComponent(image.name)}`}
+            src={`/api/files/image/${encodeURIComponent(image.name)}/thumbnail`}
             alt={image.name}
             loading="lazy"
           />

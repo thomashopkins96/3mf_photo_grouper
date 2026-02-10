@@ -6,6 +6,7 @@ interface UseFilesReturn {
   state: LoadingState;
   error: string | null;
   refetch: () => void;
+  setFiles: React.Dispatch<React.SetStateAction<FileInfo[]>>;
 }
 
 export function useFiles(type: '3mf' | 'images'): UseFilesReturn {
@@ -14,7 +15,9 @@ export function useFiles(type: '3mf' | 'images'): UseFilesReturn {
   const [error, setError] = useState<string | null>(null);
 
   const fetchFiles = useCallback(async () => {
-    setState('loading');
+    if (files.length === 0) {
+      setState('loading');
+    }
     setError(null);
 
     try {
@@ -39,5 +42,5 @@ export function useFiles(type: '3mf' | 'images'): UseFilesReturn {
     fetchFiles();
   }, [fetchFiles]);
 
-  return { files, state, error, refetch: fetchFiles };
+  return { files, state, error, refetch: fetchFiles, setFiles };
 }
