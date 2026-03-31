@@ -1,6 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { listThreeMfFiles, listImages, getThreeMfStream, getImageStream, deleteThreeMf, deleteOutputFolder, renameThreeMf, deleteImage, listOutputFolders, getImageThumbnailStream } from '../services/gcs.js'
-import { getSession } from './auth.js';
+import { listThreeMfFiles, listImages, getThreeMfSignedUrl, getImageSignedUrl, deleteThreeMf, deleteOutputFolder, renameThreeMf, deleteImage, listOutputFolders, getOrCreateThumbnailSignedUrl } from '../services/gcs.js'
 import { ApiResponse, FileInfo } from '../types/index.js';
 
 const router = Router();
@@ -26,7 +25,7 @@ function setCachedList(key: string, data: FileInfo[]): void {
 
 router.get('/3mf', async (req: Request, res: Response<ApiResponse<FileInfo[]>>) => {
   try {
-    const session = getSession(req);
+    const session = res.locals.session as { email: string; accessToken: string};
     if (!session) {
       res.status(401).json({ success: false, error: 'Unauthorized' });
       return;
@@ -38,8 +37,8 @@ router.get('/3mf', async (req: Request, res: Response<ApiResponse<FileInfo[]>>) 
       }
 
     const [files, groupedFolders] = await Promise.all([
-      listThreeMfFiles(session.accessToken),
-      listOutputFolders(session.accessToken),
+      listThreeMfFiles(),
+      listOutputFolders(),
     ]);
 
     const groupedSet = new Set(groupedFolders);
@@ -58,16 +57,14 @@ router.get('/3mf', async (req: Request, res: Response<ApiResponse<FileInfo[]>>) 
 
 router.get('/3mf/:name', async (req: Request, res: Response) => {
   try {
-    const session = getSession(req);
+    const session = res.locals.session as { email: string; accessToken: string};
     if (!session) {
       res.status(401).json({ success: false, error: 'Unauthorized' });
       return;
     }
 
-    const stream = getThreeMfStream(session.accessToken, req.params.name);
-    res.setHeader('Content-Type', 'application/octet-stream');
-    res.setHeader('Cache-Control', 'private, max-age=3600');
-    stream.pipe(res)
+    const url = await getThreeMfSignedUrl(req.params.name);
+    res.redirect(url);
   } catch (error) {
     console.error('Error streaming 3MF file:', error);
     res.status(500).json({ success: false, error: 'Failed to stream file' });
@@ -76,7 +73,7 @@ router.get('/3mf/:name', async (req: Request, res: Response) => {
 
 router.get('/images', async (req: Request, res: Response<ApiResponse<FileInfo[]>>) => {
   try {
-    const session = getSession(req);
+    const session = res.locals.session as { email: string; accessToken: string};
     if (!session) {
       res.status(401).json({ success: false, error: 'Unauthorized'});
       return;
@@ -88,7 +85,7 @@ router.get('/images', async (req: Request, res: Response<ApiResponse<FileInfo[]>
       return;
     }
 
-    const files = await listImages(session.accessToken);
+    const files = await listImages();
     setCachedList('images', files);
     res.json({ success: true, data: files });
   } catch (error) {
@@ -99,16 +96,14 @@ router.get('/images', async (req: Request, res: Response<ApiResponse<FileInfo[]>
 
 router.get('/image/:name(*)/thumbnail', async (req: Request, res: Response) => {
   try {
-    const session = getSession(req);
+    const session = res.locals.session as { email: string; accessToken: string};
     if (!session) {
       res.status(401).json({ success: false, error: "Unauthorized"});
       return;
     }
 
-    const stream = getImageThumbnailStream(session.accessToken, req.params.name);
-    res.setHeader('Content-Type', 'image/jpeg');
-    res.setHeader('Cache-Control', 'private, max-age=86400');
-    stream.pipe(res);
+    const url = await getOrCreateThumbnailSignedUrl(req.params.name);
+    res.redirect(url);
   } catch (error) {
     console.error('Error streaming thumbnail:', error);
     res.status(500).json({ success: false, error: 'Failed to stream thumbnail' });
@@ -117,15 +112,14 @@ router.get('/image/:name(*)/thumbnail', async (req: Request, res: Response) => {
 
 router.get('/image/:name(*)', async (req: Request, res: Response) => {
   try {
-    const session = getSession(req);
+    const session = res.locals.session as { email: string; accessToken: string};
     if (!session) {
       res.status(401).json({ success: false, error: 'Unauthorized' });
       return;
     }
 
-    const stream = getImageStream(session.accessToken, req.params.name);
-    res.setHeader('Cache-Control', 'private, max-age=86400');
-    stream.pipe(res);
+    const url = await getImageSignedUrl(req.params.name);
+    res.redirect(url);
   } catch (error) {
     console.error('Error stream image:', error);
     res.status(500).json({ success: false, error: 'Failed to stream image' });
@@ -134,14 +128,14 @@ router.get('/image/:name(*)', async (req: Request, res: Response) => {
 
 router.delete('/image/:name(*)', async (req: Request, res: Response<ApiResponse<string>>) => {
   try {
-    const session = getSession(req);
+    const session = res.locals.session as { email: string; accessToken: string};
     if (!session) {
       res.status(401).json({ success: false, error: 'Unauthorized' });
       return
     }
 
     const fileName = req.params.name;
-    await deleteImage(session.accessToken, fileName);
+    await deleteImage(fileName);
     listCache.delete('images');
 
     res.json({ success: true, data: `Deleted ${fileName}` });
@@ -153,7 +147,7 @@ router.delete('/image/:name(*)', async (req: Request, res: Response<ApiResponse<
 
 router.delete('/3mf/:name', async (req: Request, res: Response<ApiResponse<string>>) => {
   try {
-    const session = getSession(req);
+    const session = res.locals.session as { email: string, accessToken: string };
     if (!session) {
       res.status(401).json({ success: false, error: 'Unauthorized' });
       return;
@@ -162,8 +156,7 @@ router.delete('/3mf/:name', async (req: Request, res: Response<ApiResponse<strin
     const fileName = req.params.name;
     const folderName = fileName.replace(/\.3mf$/i, '');
 
-    await deleteThreeMf(session.accessToken, fileName);
-    await deleteOutputFolder(session.accessToken, folderName);
+    await Promise.all([deleteThreeMf(fileName), deleteOutputFolder(folderName)]);
 
     listCache.delete('3mf');
 
@@ -176,7 +169,7 @@ router.delete('/3mf/:name', async (req: Request, res: Response<ApiResponse<strin
 
 router.patch('/3mf/:name', async (req: Request, res: Response<ApiResponse<string>>) => {
   try {
-    const session = getSession(req);
+    const session = res.locals.session as { email: string; accessToken: string };
     if (!session) {
       res.status(401).json({ success: false, error: 'Unauthorized' });
       return;
@@ -189,7 +182,7 @@ router.patch('/3mf/:name', async (req: Request, res: Response<ApiResponse<string
       return
     }
 
-    await renameThreeMf(session.accessToken, oldName, newName);
+    await renameThreeMf(oldName, newName);
 
     listCache.delete('3mf');
 

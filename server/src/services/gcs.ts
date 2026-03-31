@@ -1,7 +1,7 @@
 import { Storage } from '@google-cloud/storage';
 import { FileInfo } from '../types/index.js';
 import sharp from 'sharp';
-import { PassThrough } from 'stream';
+import { pipeline } from 'stream/promises';
 
 const storage = new Storage();
 
@@ -12,26 +12,8 @@ const BUCKETS = {
 };
 
 const IMAGE_FOLDER = process.env.GCS_IMAGE_FOLDER || '';
-const storageCache = new Map<string, { storage: Storage; timestamp: number }>();
-const STORGE_CACHE_TTL = 30 * 60_000;
 
-function getStorage(accessToken: string): Storage {
-  const cached = storageCache.get(accessToken);
-  if (cached && Date.now() - cached.timestamp < STORGE_CACHE_TTL) {
-    return cached.storage;
-  }
-  const instance = new Storage({
-    authClient: {
-      getAccessToken: async () => ({ token: accessToken }),
-      getRequestHeaders: async () => ({ Authorization: `Bearer ${accessToken}` }),
-    } as any
-  });
-  storageCache.set(accessToken, { storage: instance, timestamp: Date.now() });
-  return instance;
-}
-
-export async function listThreeMfFiles(accessToken: string): Promise<FileInfo[]> {
-  const storage = getStorage(accessToken);
+export async function listThreeMfFiles(): Promise<FileInfo[]> {
   const bucket = storage.bucket(BUCKETS.threeMf);
   const [files] = await bucket.getFiles();
 
@@ -44,8 +26,7 @@ export async function listThreeMfFiles(accessToken: string): Promise<FileInfo[]>
     }));
 }
 
-export async function listImages(accessToken: string): Promise<FileInfo[]> {
-  const storage = getStorage(accessToken);
+export async function listImages(): Promise<FileInfo[]> {
   const bucket = storage.bucket(BUCKETS.images);
   const [files] = await bucket.getFiles({ prefix: IMAGE_FOLDER });
 
@@ -58,23 +39,27 @@ export async function listImages(accessToken: string): Promise<FileInfo[]> {
     }));
 }
 
-export function getThreeMfStream(accessToken: string, fileName: string) {
-  const storage = getStorage(accessToken);
-  return storage.bucket(BUCKETS.threeMf).file(fileName).createReadStream();
+export async function getThreeMfSignedUrl(fileName: string): Promise<string> {
+  const [url] = await storage.bucket(BUCKETS.threeMf).file(fileName).getSignedUrl({
+    action: 'read',
+    expires: Date.now() + 15 * 60 * 1000,
+  });
+  return url
 }
 
-export function getImageStream(accessToken: string, fileName: string) {
-  const storage = getStorage(accessToken);
-  return storage.bucket(BUCKETS.images).file(fileName).createReadStream();
+export async function getImageSignedUrl(fileName: string): Promise<string> {
+  const [url] = await storage.bucket(BUCKETS.images).file(fileName).getSignedUrl({
+    action: 'read',
+    expires: Date.now() + 60 * 60 * 1000,
+  });
+  return url;
 }
 
 export async function copyImageToOutput(
-  accessToken: string,
   sourceName: string,
   destFolder: string,
   destFileName: string
 ): Promise<void> {
-  const storage = getStorage(accessToken);
   const sourceBucket = storage.bucket(BUCKETS.images);
   const destBucket = storage.bucket(BUCKETS.output);
 
@@ -84,17 +69,18 @@ export async function copyImageToOutput(
   await sourceFile.copy(destFile);
 }
 
-export async function deleteImage(accessToken: string, fileName: string): Promise<void> {
-  const storage = getStorage(accessToken);
-  await storage.bucket(BUCKETS.images).file(fileName).delete();
+export async function deleteImage(fileName: string): Promise<void> {
+  const thumbnailName = `thumbnails/${fileName}`;
+  await Promise.all([
+    storage.bucket(BUCKETS.images).file(fileName).delete(),
+    storage.bucket(BUCKETS.images).file(thumbnailName).delete().catch(() => {}),
+  ]);
 }
 
 export async function copyThreeMfToOutput(
-  accessToken: string,
   sourceName: string,
   destFolder: string
 ): Promise<void> {
-  const storage = getStorage(accessToken);
   const sourceBucket = storage.bucket(BUCKETS.threeMf);
   const destBucket = storage.bucket(BUCKETS.output);
 
@@ -104,13 +90,11 @@ export async function copyThreeMfToOutput(
   await sourceFile.copy(destFile);
 }
 
-export async function deleteThreeMf(accessToken: string, fileName: string): Promise<void> {
-  const storage = getStorage(accessToken);
+export async function deleteThreeMf(fileName: string): Promise<void> {
   await storage.bucket(BUCKETS.threeMf).file(fileName).delete();
 }
 
-export async function deleteOutputFolder(accessToken: string, folderName: string): Promise<void> {
-  const storage = getStorage(accessToken);
+export async function deleteOutputFolder(folderName: string): Promise<void> {
   const bucket = storage.bucket(BUCKETS.output);
   const [files] = await bucket.getFiles({ prefix: `${folderName}/`});
 
@@ -119,24 +103,41 @@ export async function deleteOutputFolder(accessToken: string, folderName: string
   }
 }
 
-export async function renameThreeMf(accessToken: string, oldName: string, newName: string): Promise<void> {
-  const storage = getStorage(accessToken);
+export async function renameThreeMf(oldName: string, newName: string): Promise<void> {
   const bucket = storage.bucket(BUCKETS.threeMf);
 
   await bucket.file(oldName).copy(bucket.file(newName));
   await bucket.file(oldName).delete();
 }
 
-export async function listOutputFolders(accessToken: string): Promise<string[]> {
-  const storage = getStorage(accessToken);
+export async function listOutputFolders(): Promise<string[]> {
   const [, , apiResponse] = await storage.bucket(BUCKETS.output).getFiles({ delimiter: '/' });
   const prefixes: string[] = (apiResponse as any)?.prefixes || [];
   return prefixes.map(p => p.replace(/\/$/, ''));
 }
 
-export function getImageThumbnailStream(accessToken: string, fileName: string, width = 400) {
-  const storage = getStorage(accessToken);
-  const readStream = storage.bucket(BUCKETS.images).file(fileName).createReadStream();
+async function generateThumbnail(sourceFileName: string, thumbnailName: string, width: number): Promise<void> {
+  const readStream = storage.bucket(BUCKETS.images).file(sourceFileName).createReadStream();
   const transform = sharp().resize(width).jpeg({ quality: 70 });
-  return readStream.pipe(transform);
+  const writeStream = storage.bucket(BUCKETS.images).file(thumbnailName).createWriteStream({
+    metadata: { contentType: 'image/jpeg' },
+  });
+
+  await pipeline(readStream, transform, writeStream);
+}
+
+export async function getOrCreateThumbnailSignedUrl(fileName: string, width = 400): Promise<string> {
+  const thumbnailName = `thumbnails/${fileName}`;
+  const thumbnailFile = storage.bucket(BUCKETS.images).file(thumbnailName);
+
+  const [exists] = await thumbnailFile.exists();
+  if (!exists) {
+    await generateThumbnail(fileName, thumbnailName, width);
+  }
+
+  const [url] = await thumbnailFile.getSignedUrl({
+    action: 'read',
+    expires: Date.now() + 24 * 60 * 60 * 1000,
+  });
+  return url;
 }

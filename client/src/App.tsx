@@ -210,9 +210,13 @@ export default function App() {
           <main className="app-main">
             <Layout
               leftPanel={
+                currentFile ? (
                 <Suspense fallback={<div className="gallery-empty">Loading viewer...</div>}>
                   <ThreeMFViewer fileUrl={threeMfUrl} />
                 </Suspense>
+                ) : (
+                  <div className="gallery-empty">Select a 3MF file to preview</div>
+                )
               }
               rightPanel={
                 imagesState === 'loading' ? (
@@ -244,7 +248,9 @@ export default function App() {
               />
             </div>
             <div className="viewer-main">
-              <ThreeMFViewer fileUrl={viewerFileUrl} />
+              <Suspense fallback={<div className="gallery-empty">Loading viewer...</div>}>
+                <ThreeMFViewer fileUrl={viewerFileUrl} />
+              </Suspense>
             </div>
           </div>
         </main>

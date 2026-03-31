@@ -1,6 +1,5 @@
 import { Router, Request, Response } from 'express';
 import { copyImageToOutput, copyThreeMfToOutput, deleteImage } from '../services/gcs.js'
-import { getSession } from './auth.js';
 import { ApiResponse, GroupRequest } from '../types/index.js'
 import { invalidateFileCache } from './files.js';
 
@@ -11,7 +10,7 @@ router.post('/', async (
   res: Response<ApiResponse<string>>
   ) => {
   try {
-    const session = getSession(req);
+    const session = res.locals.session as { email: string; accessToken: string; };
     if (!session) {
         res.status(401).json({ success: false, error: 'Unauthorized' });
         return;
@@ -19,13 +18,13 @@ router.post('/', async (
 
     const { threeMfName, images } = req.body;
     const folderName = threeMfName.replace(/\.3mf$/i, '');
-    await copyThreeMfToOutput(session.accessToken, threeMfName, folderName);
+    await copyThreeMfToOutput(threeMfName, folderName);
 
     await Promise.all(images.map(async (image) => {
         const ext = image.originalName.match(/\.[^.]+$/)?.[0] || '.jpg';
         const destFileName = image.newName + ext;
-        await copyImageToOutput(session.accessToken, image.originalName, folderName, destFileName);
-        await deleteImage(session.accessToken, image.originalName);
+        await copyImageToOutput(image.originalName, folderName, destFileName);
+        await deleteImage(image.originalName);
       }));
 
     invalidateFileCache();

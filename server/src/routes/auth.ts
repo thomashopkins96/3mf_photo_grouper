@@ -1,6 +1,10 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { OAuth2Client } from 'google-auth-library';
 import { ApiResponse } from '../types/index.js';
+import { Firestore } from '@google-cloud/firestore';
+
+const db = new Firestore();
+const SESSIONS_COLLECTION = 'sessions';
 
 const router = Router();
 
@@ -11,8 +15,6 @@ const REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI || '';
 const oauth2Client = new OAuth2Client(CLIENT_ID, CLIENT_SECRET, REDIRECT_URI);
 const COOKIE_NAME = 'auth_token';
 const COOKIE_MAX_AGE = 7 * 24 * 60 * 60 * 1000;
-
-const validSessions = new Map<string, { email: string; accessToken: string }>();
 
 function generateSessionId(): string {
   return Buffer.from(Date.now().toString() + Math.random().toString()).toString('base64');
@@ -49,9 +51,10 @@ router.get('/callback', async (req: Request, res: Response) => {
     const email = payload?.email || 'unknown';
 
     const sessionId = generateSessionId();
-    validSessions.set(sessionId, {
+    await db.collection(SESSIONS_COLLECTION).doc(sessionId).set({
       email,
       accessToken: tokens.access_token || '',
+      expiresAt: new Date(Date.now() + COOKIE_MAX_AGE),
     });
 
     res.cookie(COOKIE_NAME, sessionId, {
@@ -72,19 +75,17 @@ router.get('/callback', async (req: Request, res: Response) => {
   }
 });
 
-router.post('/logout', (req: Request, res: Response<ApiResponse<string>>) => {
+router.post('/logout', async (req: Request, res: Response<ApiResponse<string>>) => {
   const sessionId = req.cookies[COOKIE_NAME];
   if (sessionId) {
-    validSessions.delete(sessionId);
+    await db.collection(SESSIONS_COLLECTION).doc(sessionId).delete();
   }
   res.clearCookie(COOKIE_NAME);
   res.json({ success: true, data: 'Logged out' });
 });
 
-router.get('/check', (req: Request, res: Response<ApiResponse<{ authenticated: boolean; email?: string }>>) => {
-  const sessionId = req.cookies[COOKIE_NAME];
-  const session = sessionId ? validSessions.get(sessionId) : null;
-
+router.get('/check', async (req: Request, res: Response<ApiResponse<{ authenticated: boolean; email?: string }>>) => {
+  const session = await getSession(req);
   res.json({
     success: true,
     data: {
@@ -94,15 +95,22 @@ router.get('/check', (req: Request, res: Response<ApiResponse<{ authenticated: b
   });
 });
 
-export function getSession(req: Request): { email: string; accessToken: string } | null {
+export async function getSession(req: Request): Promise<{ email: string; accessToken: string } | null> {
   const sessionId = req.cookies[COOKIE_NAME];
-  return sessionId ? validSessions.get(sessionId) || null : null;
+  if (!sessionId) return null;
+
+  const doc = await db.collection(SESSIONS_COLLECTION).doc(sessionId).get();
+  if (!doc.exists) return null;
+
+  const data = doc.data();
+  return data ? { email: data.email, accessToken: data.accessToken } : null;
 }
 
-export function requireAuth(req: Request, res: Response, next: NextFunction): void {
-  const session = getSession(req);
+export async function requireAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
+  const session = await getSession(req);
 
   if (session) {
+    res.locals.session = session;
     next();
   } else {
     res.status(401).json({ success: false, error: "Unauthorized" });
